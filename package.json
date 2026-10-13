@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "report:mm1": "vitest run --config scripts/vitest.config.ts"
   },
   "dependencies": {
     "@xyflow/react": "^12.3.6",

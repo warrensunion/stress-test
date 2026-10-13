@@ -205,7 +205,11 @@ export default function App() {
             <aside className="w-44 shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50">
               <Palette
                 onAdd={(t) => {
-                  const [next, id] = addNode(design, t, { x: 100 + design.nodes.length * 30, y: 300 });
+                  // Drop new nodes just below the current design; the canvas re-fits to show them.
+                  const xs = design.nodes.map((n) => n.position.x);
+                  const ys = design.nodes.map((n) => n.position.y);
+                  const pos = xs.length ? { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: Math.max(...ys) + 140 } : { x: 0, y: 0 };
+                  const [next, id] = addNode(design, t, pos);
                   setDesign(next);
                   setSelectedId(id);
                 }}

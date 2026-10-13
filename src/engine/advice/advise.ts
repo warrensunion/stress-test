@@ -109,7 +109,7 @@ function bottleneckCandidates(design: Design, baseline: Measurement): Candidate[
   // one would just move the limit a few percent, so also offer a combined fix.
   const top = flowsAtSat.nodes[id]?.utilization ?? 0;
   const co = Object.values(flowsAtSat.nodes)
-    .filter((n) => n.nodeId !== id && top > 0 && n.utilization >= top * 0.85)
+    .filter((n) => n.nodeId !== id && top > 0 && Number.isFinite(n.utilization) && n.utilization >= top * 0.85)
     .sort((a, b) => b.utilization - a.utilization)
     .map((n) => n.nodeId);
   const coFixes = co.map((c) => scaleFixFor(design, flowsAtTarget, c, 0.8)).filter((x): x is Fix => !!x);
