@@ -3,9 +3,12 @@ import { useMemo, useRef, useState } from 'react';
 import { DesignCanvas, type NodeDecor } from './components/DesignCanvas';
 import { Estimator } from './components/Estimator';
 import { Inspector } from './components/Inspector';
+import { IssuesPanel } from './components/IssuesPanel';
 import { Palette } from './components/Palette';
 import { SimPanel, type RunSettings } from './components/SimPanel';
 import { addNode } from './engine/designOps';
+import { applyFix, type Fix } from './engine/fixes';
+import { lint } from './engine/lint';
 import { parseDesign, serializeDesign } from './engine/schema';
 import type { ChaosEvent } from './engine/sim/simulation';
 import type { Design } from './engine/types';
@@ -13,7 +16,7 @@ import { useSimulator } from './hooks/useSimulator';
 import { starterDesign } from './presets/starter';
 
 type View = 'design' | 'estimator';
-type SideTab = 'inspector';
+type SideTab = 'inspector' | 'issues';
 
 export default function App() {
   const [view, setView] = useState<View>('design');
@@ -56,6 +59,14 @@ export default function App() {
   };
 
   const stale = sim.design !== null && sim.design !== design;
+  const findings = useMemo(() => lint(design), [design]);
+
+  // Apply a fix; if we have simulation results, re-simulate the fixed design right away.
+  const applyAndRerun = (fix: Fix) => {
+    const next = applyFix(design, fix);
+    setDesign(next);
+    if (sim.result && !sim.running) runSim(false, scheduled, next);
+  };
 
   // Per-node overlays on the canvas: client traffic, live utilization, dead nodes, bottleneck.
   const decor = useMemo(() => {
@@ -63,6 +74,9 @@ export default function App() {
     const clients = design.nodes.filter((n) => n.type === 'client');
     for (const n of design.nodes) out[n.id] = { issues: [] };
     for (const c of clients) out[c.id].rps = design.workload.rps / clients.length;
+    for (const f of findings) {
+      for (const id of f.nodeIds) out[id]?.issues?.push({ severity: f.severity, message: `${f.title}: ${f.message}` });
+    }
     const r = sim.result;
     if (r && !stale) {
       const lastPoint = r.series[r.series.length - 1];
@@ -79,7 +93,7 @@ export default function App() {
       }
     }
     return out;
-  }, [design, sim.result, sim.running, stale]);
+  }, [design, findings, sim.result, sim.running, stale]);
 
   return (
     <div className="flex h-full flex-col">
@@ -165,17 +179,25 @@ export default function App() {
             </div>
             <aside className="flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
               <div className="flex border-b border-slate-200 text-sm">
-                {(['inspector'] as SideTab[]).map((t) => (
+                {(['inspector', 'issues'] as SideTab[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => setSideTab(t)}
                     className={`flex-1 px-2 py-2 capitalize ${sideTab === t ? 'border-b-2 border-indigo-600 font-medium text-indigo-700' : 'text-slate-600'}`}
                   >
                     {t}
+                    {t === 'issues' && findings.length > 0 && (
+                      <span className="ml-1 rounded-full bg-amber-100 px-1.5 text-xs text-amber-800" data-testid="issues-count">
+                        {findings.length}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto">
+                {sideTab === 'issues' && (
+                  <IssuesPanel design={design} findings={findings} onSelectNode={setSelectedId} onApplyFix={applyAndRerun} />
+                )}
                 {sideTab === 'inspector' && (
                   <Inspector design={design} selectedId={selectedId} onChange={setDesign} onDeselect={() => setSelectedId(null)} />
                 )}

@@ -14,11 +14,11 @@ import {
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
 import { addEdge, addNode, moveNodes, removeEdges, removeNodes } from '../engine/designOps';
 import type { ComponentType, Design } from '../engine/types';
-import { SystemNode, type SystemFlowNode, type SystemNodeData } from './SystemNode';
+import { SystemNode, type NodeDecor, type SystemFlowNode } from './SystemNode';
 
 const nodeTypes = { system: SystemNode };
 
-export type NodeDecor = Omit<SystemNodeData, 'dn'>;
+export type { NodeDecor };
 
 interface Props {
   design: Design;
@@ -32,7 +32,14 @@ interface Props {
 export const DRAG_MIME = 'application/x-stress-test-component';
 
 export function DesignCanvas({ design, onChange, selectedId, onSelect, decor, activeEdges }: Props) {
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
+
+  // Re-frame the view when nodes are added or removed (e.g. by an auto-fix).
+  const nodeCount = design.nodes.length;
+  useEffect(() => {
+    const t = setTimeout(() => void fitView({ padding: 0.2, duration: 200 }), 50);
+    return () => clearTimeout(t);
+  }, [nodeCount, fitView]);
 
   // React Flow needs to keep its own measured sizes on node objects, so we hold RF nodes in
   // local state and re-sync them from the design (the source of truth) whenever it changes.

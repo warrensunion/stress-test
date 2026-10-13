@@ -6,13 +6,16 @@ import { pct, SEVERITY_STYLE, TYPE_STYLE, utilColor } from './theme';
 
 export type Severity = 'error' | 'warning' | 'info';
 
-export interface SystemNodeData extends Record<string, unknown> {
-  dn: DesignNode;
+export interface NodeDecor {
   issues: { severity: Severity; message: string }[];
   util?: number;
   dead?: boolean;
   isBottleneck?: boolean;
   rps?: number;
+}
+
+export interface SystemNodeData extends NodeDecor, Record<string, unknown> {
+  dn: DesignNode;
 }
 
 export type SystemFlowNode = Node<SystemNodeData, 'system'>;
