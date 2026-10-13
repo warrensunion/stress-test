@@ -1,11 +1,13 @@
 import { ReactFlowProvider } from '@xyflow/react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AdvicePanel, type AppliedRecord } from './components/AdvicePanel';
 import { DesignCanvas, type NodeDecor } from './components/DesignCanvas';
 import { Estimator } from './components/Estimator';
 import { Inspector } from './components/Inspector';
 import { IssuesPanel } from './components/IssuesPanel';
 import { Palette } from './components/Palette';
 import { SimPanel, type RunSettings } from './components/SimPanel';
+import type { Recommendation } from './engine/advice/types';
 import { addNode } from './engine/designOps';
 import { applyFix, type Fix } from './engine/fixes';
 import { lint } from './engine/lint';
@@ -16,7 +18,7 @@ import { useSimulator } from './hooks/useSimulator';
 import { starterDesign } from './presets/starter';
 
 type View = 'design' | 'estimator';
-type SideTab = 'inspector' | 'issues';
+type SideTab = 'inspector' | 'issues' | 'advice';
 
 export default function App() {
   const [view, setView] = useState<View>('design');
@@ -34,6 +36,7 @@ export default function App() {
     setDesign(d);
     setSelectedId(null);
     setScheduled([]);
+    setApplied([]);
     setCanvasKey((k) => k + 1);
   };
 
@@ -59,6 +62,41 @@ export default function App() {
   };
 
   const stale = sim.design !== null && sim.design !== design;
+
+  // Advice loop: apply a recommendation, re-simulate, then re-analyze for the next step.
+  const [applied, setApplied] = useState<(AppliedRecord & { design: Design })[]>([]);
+  const applyRecommendation = (rec: Recommendation) => {
+    if (!sim.advice) return;
+    const next = applyFix(design, rec.fix);
+    setDesign(next);
+    setApplied((a) => [
+      ...a,
+      {
+        title: rec.title,
+        beforeRps: sim.advice!.baseline.saturationRps,
+        predictedRps: rec.after.saturationRps,
+        measuredRps: null,
+        beforeBottleneck: sim.advice!.baseline.bottleneckNodeId,
+        afterBottleneck: rec.after.bottleneckNodeId,
+        design: next,
+      },
+    ]);
+    runSim(false, [], next);
+    sim.advise(next, settings.seed);
+  };
+  useEffect(() => {
+    if (!sim.saturation || !sim.design) return;
+    const sat = sim.saturation;
+    setApplied((a) =>
+      a.some((r) => r.design === sim.design && r.measuredRps === null)
+        ? a.map((r) =>
+            r.design === sim.design && r.measuredRps === null
+              ? { ...r, measuredRps: sat.rps, afterBottleneck: sat.bottleneckNodeId ?? r.afterBottleneck }
+              : r,
+          )
+        : a,
+    );
+  }, [sim.saturation, sim.design]);
   const findings = useMemo(() => lint(design), [design]);
 
   // Apply a fix; if we have simulation results, re-simulate the fixed design right away.
@@ -179,7 +217,7 @@ export default function App() {
             </div>
             <aside className="flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
               <div className="flex border-b border-slate-200 text-sm">
-                {(['inspector', 'issues'] as SideTab[]).map((t) => (
+                {(['inspector', 'issues', 'advice'] as SideTab[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => setSideTab(t)}
@@ -195,6 +233,15 @@ export default function App() {
                 ))}
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto">
+                {sideTab === 'advice' && (
+                  <AdvicePanel
+                    design={design}
+                    sim={sim}
+                    onAnalyze={() => sim.advise(design, settings.seed)}
+                    onApply={applyRecommendation}
+                    applied={applied}
+                  />
+                )}
                 {sideTab === 'issues' && (
                   <IssuesPanel design={design} findings={findings} onSelectNode={setSelectedId} onApplyFix={applyAndRerun} />
                 )}

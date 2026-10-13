@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import { buildAdvice } from '../engine/advice/advise';
 import { findSaturation } from '../engine/sim/saturation';
 import { Simulation } from '../engine/sim/simulation';
 import type { Design } from '../engine/types';
@@ -50,6 +51,8 @@ self.onmessage = (ev: MessageEvent<ToWorker>) => {
         }
       };
       tick();
+    } else if (msg.type === 'advise') {
+      post({ type: 'advice', runId: msg.runId, advice: buildAdvice(msg.design, { seed: msg.seed }) });
     } else if (msg.type === 'chaos') {
       if (current?.runId === msg.runId) current.sim.inject(msg.action);
     } else if (msg.type === 'stop') {
