@@ -595,7 +595,8 @@ export class Simulation {
         finalQueue,
       };
       nodes[n.id] = stats;
-      if (arrivals > 0 && (!bottleneck || u > bottleneck.utilization)) {
+      // Undrained queues (no consumers, utilization ∞) are an async problem, not a throughput limit.
+      if (arrivals > 0 && Number.isFinite(u) && (!bottleneck || u > bottleneck.utilization)) {
         bottleneck = { nodeId: n.id, utilization: u, saturated: false };
       }
     }

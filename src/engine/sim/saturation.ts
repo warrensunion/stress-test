@@ -19,10 +19,10 @@ export interface SaturationOptions {
   iterations?: number;
 }
 
-/** A run is "saturated" if errors exceed 1% or any node is ≥ 97% busy (incl. undrained queues). */
+/** A run is "saturated" if errors exceed 1% or any node is ≥ 97% busy (undrained queues excluded — the linter flags those). */
 export function isSaturated(r: SimResult): boolean {
   if (r.errorRate > 0.01) return true;
-  return Object.values(r.nodes).some((n) => n.utilization >= 0.97);
+  return Object.values(r.nodes).some((n) => Number.isFinite(n.utilization) && n.utilization >= 0.97);
 }
 
 /**
@@ -53,7 +53,7 @@ export function findSaturation(design: Design, opts: SaturationOptions = {}): Sa
     const r = simulate(design, { rps, seed, durationSec: probeSec, warmupSec: Math.min(1, probeSec / 3), sampleIntervalSec: 1 });
     const saturated = isSaturated(r);
     const top = Object.values(r.nodes).reduce<{ id: string; u: number } | null>(
-      (best, n) => (n.arrivals > 0 && (!best || n.utilization > best.u) ? { id: n.id, u: n.utilization } : best),
+      (best, n) => (n.arrivals > 0 && Number.isFinite(n.utilization) && (!best || n.utilization > best.u) ? { id: n.id, u: n.utilization } : best),
       null,
     );
     probes.push({ rps, saturated, bottleneckNodeId: top?.id ?? null });

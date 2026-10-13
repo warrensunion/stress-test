@@ -9,9 +9,10 @@
 - Phase 6: linter (`src/engine/lint/`) — 17 rules with id, severity, message, why, suggested fix and (where possible) a machine-applicable fix (`src/engine/fixes.ts`); badges on canvas nodes; Issues tab with "Apply fix" (re-simulates if results exist).
 - Phase 7: advice loop (`src/engine/advice/`) — simulated bottleneck + lint auto-fixes → candidate fixes, each re-simulated and ranked by measured saturation gain; co-bottleneck combined fixes; template explainer behind a pluggable `Explainer` interface; Advice tab with "Apply suggestion & re-simulate" and an applied log (before → after).
 - Phase 8: chaos mode — kill node / kill 1 instance / +200 ms latency / spike 10× (live injection or scheduled mid-run), revive and traffic reset in live runs, chaos markers on charts, "What broke" card (`src/engine/sim/chaosImpact.ts`): error rate, latency blowup, cascading saturation, failover behaviour.
+- Phase 9: presets (`src/presets/index.ts`) in a header dropdown — starter, URL shortener, Twitter-style feed (CDN, timeline cache, async fan-out), deliberately bad design (10 lint findings, DB bottleneck, undrained queue). Tests assert the bad design is caught and the top advice measurably improves it.
 
 ## Next
-- Phase 9: presets.
+- Phase 10: polish + README + Playwright smoke test.
 
 ## Known issues
 - Double-click-to-add places nodes at a fixed spot that may be outside the current viewport.

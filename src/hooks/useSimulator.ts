@@ -94,5 +94,13 @@ export function useSimulator() {
   const inject = useCallback((action: ChaosAction) => send({ type: 'chaos', runId: runIdRef.current, action }), []);
   const stop = useCallback(() => send({ type: 'stop', runId: runIdRef.current }), []);
 
-  return { ...state, run, advise, inject, stop };
+  // Forget results (e.g. when a different design is loaded). Bumping ids drops in-flight replies.
+  const reset = useCallback(() => {
+    if (state.running) send({ type: 'stop', runId: runIdRef.current });
+    runIdRef.current++;
+    adviceIdRef.current++;
+    setState({ result: null, saturation: null, running: false, analyzing: false, error: null, design: null, advice: null, advising: false, adviceDesign: null });
+  }, [state.running]);
+
+  return { ...state, run, advise, inject, stop, reset };
 }

@@ -94,7 +94,8 @@ export function computeFlows(design: Design, rps = design.workload.rps): FlowRes
       saturationRps: utilization > 0 ? rps / utilization : Infinity,
     };
     nodes[n.id] = nf;
-    if (nf.rate > 0 && (!bottleneck || nf.utilization > bottleneck.utilization)) bottleneck = nf;
+    // Undrained queues (∞) are flagged by the linter; they never limit synchronous throughput.
+    if (nf.rate > 0 && Number.isFinite(nf.utilization) && (!bottleneck || nf.utilization > bottleneck.utilization)) bottleneck = nf;
   }
   return { rps, nodes, bottleneck };
 }

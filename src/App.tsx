@@ -15,14 +15,14 @@ import { parseDesign, serializeDesign } from './engine/schema';
 import type { ChaosEvent } from './engine/sim/simulation';
 import type { Design } from './engine/types';
 import { useSimulator } from './hooks/useSimulator';
-import { starterDesign } from './presets/starter';
+import { PRESETS } from './presets';
 
 type View = 'design' | 'estimator';
 type SideTab = 'inspector' | 'issues' | 'advice';
 
 export default function App() {
   const [view, setView] = useState<View>('design');
-  const [design, setDesign] = useState<Design>(starterDesign);
+  const [design, setDesign] = useState<Design>(() => PRESETS[0].build());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [canvasKey, setCanvasKey] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
@@ -37,6 +37,7 @@ export default function App() {
     setSelectedId(null);
     setScheduled([]);
     setApplied([]);
+    sim.reset();
     setCanvasKey((k) => k + 1);
   };
 
@@ -152,6 +153,25 @@ export default function App() {
         </nav>
         <div className="ml-auto flex items-center gap-2 text-sm">
           {notice && <span className="text-slate-500">{notice}</span>}
+          <select
+            className="rounded border border-slate-300 px-2 py-1"
+            value=""
+            data-testid="preset-select"
+            onChange={(e) => {
+              const p = PRESETS.find((x) => x.id === e.target.value);
+              if (p) {
+                loadDesign(p.build());
+                setNotice(`Loaded preset: ${p.name}`);
+              }
+            }}
+          >
+            <option value="">Load preset…</option>
+            {PRESETS.map((p) => (
+              <option key={p.id} value={p.id} title={p.description}>
+                {p.name}
+              </option>
+            ))}
+          </select>
           <button className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50" onClick={() => fileRef.current?.click()}>
             Import JSON
           </button>

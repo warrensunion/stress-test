@@ -22,3 +22,4 @@ Ambiguities resolved without asking, simplest reasonable option chosen.
 | 16 | Chaos buttons inject immediately during a live run; otherwise they schedule the event at mid-run and re-run (deterministic, reproducible). | Works whether or not the user is watching a live run. |
 | 17 | Killing a SQL DB that has replicas kills only the primary (writes fail, replicas keep serving reads). Added "kill 1 instance" alongside "kill node". | Makes replicas and instance counts matter under failure. |
 | 18 | "What broke" compares the 5 s before the first chaos event with everything after it (skipping 1 s settle time): error rate, throughput, worst p99, newly saturated nodes (cascade). | Simple, explainable before/after diff. |
+| 19 | Queues with no consumers have utilization ∞ but are excluded from "first bottleneck" and saturation detection; the linter and async backlog stats report them instead. | Otherwise any orphan queue would mask the real throughput bottleneck. |
