@@ -23,4 +23,5 @@ export const pct = (u: number) => (Number.isFinite(u) ? `${Math.round(u * 100)}%
 export const utilColor = (u: number) => (!Number.isFinite(u) || u >= 0.95 ? '#dc2626' : u >= 0.75 ? '#d97706' : '#16a34a');
 
 /** Stable colors for chart series. */
-export const SERIES_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#0ea5e9', '#a855f7', '#14b8a6', '#64748b', '#ec4899', '#84cc16'];
+// Validated categorical order (dataviz reference palette, light mode). Max 8 series; fold the rest.
+export const SERIES_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];

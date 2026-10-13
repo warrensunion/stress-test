@@ -2,7 +2,7 @@ import {
   Background,
   Controls,
   MarkerType,
-  MiniMap,
+
   ReactFlow,
   useReactFlow,
   type Connection,
@@ -129,7 +129,6 @@ export function DesignCanvas({ design, onChange, selectedId, onSelect, decor, ac
       >
         <Background gap={16} />
         <Controls />
-        <MiniMap pannable zoomable />
       </ReactFlow>
     </div>
   );

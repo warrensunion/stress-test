@@ -429,18 +429,17 @@ export class Simulation {
       this.asyncLags.push((t - req.start) * 1000);
       return;
     }
+    // Time-series windows include warmup traffic; summary stats do not.
+    const ms = (t - req.start) * 1000;
+    const late = ms > this.config.timeoutMs;
+    this.win.lat.push(ms);
+    if (late) this.win.err++;
+    else this.win.ok++;
     if (!req.counted) return;
     this.inflight.delete(req.id);
-    const ms = (t - req.start) * 1000;
     this.latencies.push(ms);
-    this.win.lat.push(ms);
-    if (ms > this.config.timeoutMs) {
-      this.timeouts++;
-      this.win.err++;
-    } else {
-      this.succeeded++;
-      this.win.ok++;
-    }
+    if (late) this.timeouts++;
+    else this.succeeded++;
   }
 
   private fail(req: Req, reason: 'dropped' | 'unavailable', at: NodeRT) {
@@ -449,9 +448,9 @@ export class Simulation {
       this.asyncStats.failed++;
       return;
     }
+    this.win.err++;
     if (!req.counted) return;
     this.inflight.delete(req.id);
-    this.win.err++;
     if (reason === 'dropped') this.dropped++;
     else this.unavailable++;
   }

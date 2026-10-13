@@ -47,8 +47,10 @@ export function findSaturation(design: Design, opts: SaturationOptions = {}): Sa
   if (analyticRps <= 0) return { ...empty, rps: 0, bottleneckNodeId: flows.bottleneck?.nodeId ?? null };
 
   let lastSaturatedBottleneck: string | null = null;
+  // Keep probes cheap at very high loads: ~400k requests per probe at most.
+  const probeSec = Math.min(durationSec, Math.max(2, 400_000 / analyticRps));
   const probe = (rps: number) => {
-    const r = simulate(design, { rps, seed, durationSec, warmupSec: 1, sampleIntervalSec: 1 });
+    const r = simulate(design, { rps, seed, durationSec: probeSec, warmupSec: Math.min(1, probeSec / 3), sampleIntervalSec: 1 });
     const saturated = isSaturated(r);
     const top = Object.values(r.nodes).reduce<{ id: string; u: number } | null>(
       (best, n) => (n.arrivals > 0 && (!best || n.utilization > best.u) ? { id: n.id, u: n.utilization } : best),

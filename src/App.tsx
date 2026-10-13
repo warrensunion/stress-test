@@ -1,15 +1,19 @@
 import { ReactFlowProvider } from '@xyflow/react';
-import { useRef, useState } from 'react';
-import { DesignCanvas } from './components/DesignCanvas';
+import { useMemo, useRef, useState } from 'react';
+import { DesignCanvas, type NodeDecor } from './components/DesignCanvas';
 import { Estimator } from './components/Estimator';
 import { Inspector } from './components/Inspector';
 import { Palette } from './components/Palette';
+import { SimPanel, type RunSettings } from './components/SimPanel';
 import { addNode } from './engine/designOps';
 import { parseDesign, serializeDesign } from './engine/schema';
+import type { ChaosEvent } from './engine/sim/simulation';
 import type { Design } from './engine/types';
+import { useSimulator } from './hooks/useSimulator';
 import { starterDesign } from './presets/starter';
 
 type View = 'design' | 'estimator';
+type SideTab = 'inspector';
 
 export default function App() {
   const [view, setView] = useState<View>('design');
@@ -17,13 +21,21 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [canvasKey, setCanvasKey] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const [sideTab, setSideTab] = useState<SideTab>('inspector');
+  const [settings, setSettings] = useState<RunSettings>({ durationSec: 30, seed: 42, speed: 3 });
+  const [scheduled, setScheduled] = useState<ChaosEvent[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const sim = useSimulator();
 
   const loadDesign = (d: Design) => {
     setDesign(d);
     setSelectedId(null);
+    setScheduled([]);
     setCanvasKey((k) => k + 1);
   };
+
+  const runSim = (live: boolean, chaos: ChaosEvent[], d: Design = design) =>
+    sim.run(d, { live, speed: settings.speed, config: { durationSec: settings.durationSec, seed: settings.seed, chaos } });
 
   const exportJson = () => {
     const blob = new Blob([serializeDesign(design)], { type: 'application/json' });
@@ -42,6 +54,32 @@ export default function App() {
       setNotice(`Import failed: ${(err as Error).message}`);
     }
   };
+
+  const stale = sim.design !== null && sim.design !== design;
+
+  // Per-node overlays on the canvas: client traffic, live utilization, dead nodes, bottleneck.
+  const decor = useMemo(() => {
+    const out: Record<string, Partial<NodeDecor>> = {};
+    const clients = design.nodes.filter((n) => n.type === 'client');
+    for (const n of design.nodes) out[n.id] = { issues: [] };
+    for (const c of clients) out[c.id].rps = design.workload.rps / clients.length;
+    const r = sim.result;
+    if (r && !stale) {
+      const lastPoint = r.series[r.series.length - 1];
+      const dead = new Set<string>();
+      for (const e of r.chaosLog) {
+        if (e.kind === 'kill') dead.add(e.nodeId);
+        if (e.kind === 'revive') dead.delete(e.nodeId);
+      }
+      for (const [id, s] of Object.entries(r.nodes)) {
+        if (!out[id]) continue;
+        out[id].util = sim.running && lastPoint ? (lastPoint.util[id] ?? 0) : s.utilization;
+        out[id].dead = dead.has(id);
+        out[id].isBottleneck = !sim.running && r.bottleneck?.nodeId === id && r.bottleneck.saturated;
+      }
+    }
+    return out;
+  }, [design, sim.result, sim.running, stale]);
 
   return (
     <div className="flex h-full flex-col">
@@ -90,7 +128,7 @@ export default function App() {
           />
         ) : (
           <div className="flex h-full">
-            <aside className="w-48 shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50">
+            <aside className="w-44 shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50">
               <Palette
                 onAdd={(t) => {
                   const [next, id] = addNode(design, t, { x: 100 + design.nodes.length * 30, y: 300 });
@@ -99,19 +137,49 @@ export default function App() {
                 }}
               />
             </aside>
-            <section className="min-w-0 flex-1">
-              <ReactFlowProvider key={canvasKey}>
-                <DesignCanvas
+            <div className="flex min-w-0 flex-1 flex-col">
+              <section className="min-h-[240px] flex-1">
+                <ReactFlowProvider key={canvasKey}>
+                  <DesignCanvas
+                    design={design}
+                    onChange={setDesign}
+                    selectedId={selectedId}
+                    onSelect={setSelectedId}
+                    decor={decor}
+                    activeEdges={sim.running}
+                  />
+                </ReactFlowProvider>
+              </section>
+              <section className="max-h-[45%] shrink-0 overflow-y-auto border-t border-slate-200 bg-slate-50">
+                <SimPanel
                   design={design}
-                  onChange={setDesign}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                  decor={Object.fromEntries(design.nodes.filter((n) => n.type === 'client').map((n, _i, cs) => [n.id, { rps: design.workload.rps / cs.length }]))}
+                  sim={sim}
+                  settings={settings}
+                  onSettings={setSettings}
+                  onRun={runSim}
+                  scheduled={scheduled}
+                  onScheduled={setScheduled}
+                  stale={stale}
                 />
-              </ReactFlowProvider>
-            </section>
-            <aside className="w-80 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
-              <Inspector design={design} selectedId={selectedId} onChange={setDesign} onDeselect={() => setSelectedId(null)} />
+              </section>
+            </div>
+            <aside className="flex w-80 shrink-0 flex-col border-l border-slate-200 bg-white">
+              <div className="flex border-b border-slate-200 text-sm">
+                {(['inspector'] as SideTab[]).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setSideTab(t)}
+                    className={`flex-1 px-2 py-2 capitalize ${sideTab === t ? 'border-b-2 border-indigo-600 font-medium text-indigo-700' : 'text-slate-600'}`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {sideTab === 'inspector' && (
+                  <Inspector design={design} selectedId={selectedId} onChange={setDesign} onDeselect={() => setSelectedId(null)} />
+                )}
+              </div>
             </aside>
           </div>
         )}
