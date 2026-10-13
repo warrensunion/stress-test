@@ -169,7 +169,7 @@ describe('chaos', () => {
         ['lb', 'loadBalancer'],
         ['a1', 'appServer', { capacity: 600, instances: 1, latencyMs: 2 }],
         ['a2', 'appServer', { capacity: 600, instances: 1, latencyMs: 2 }],
-        ['db', 'sqlDb', { capacity: 5000, replicas: 1 }],
+        ['db', 'sqlDb', { capacity: 5000, replicas: 0 }],
       ],
       ['c>lb>a1>db', 'lb>a2>db'],
       { rps: 500 },

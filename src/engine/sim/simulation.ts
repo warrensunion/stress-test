@@ -25,6 +25,7 @@ import { Deque, EventHeap, percentile } from './structures';
 
 export type ChaosEvent =
   | { atSec: number; kind: 'kill'; nodeId: string }
+  | { atSec: number; kind: 'killInstance'; nodeId: string }
   | { atSec: number; kind: 'revive'; nodeId: string }
   | { atSec: number; kind: 'latency'; nodeId: string; addMs: number }
   | { atSec: number; kind: 'spike'; factor: number };
@@ -115,6 +116,7 @@ interface Req {
 
 interface Pool {
   servers: number;
+  baseServers: number;
   busy: number;
   queue: Deque<Req>;
   meanService: number;
@@ -202,6 +204,7 @@ export class Simulation {
       const p = n.params;
       const mkPool = (servers: number): Pool => ({
         servers,
+        baseServers: servers,
         busy: 0,
         queue: new Deque(),
         meanService: 1 / p.capacity,
@@ -362,6 +365,7 @@ export class Simulation {
     let best = n.pools[0];
     let bestLoad = Infinity;
     for (const p of n.pools) {
+      if (p.servers <= 0) continue; // killed pool (e.g. failed primary)
       const load = (p.busy + p.queue.length) / p.servers;
       if (load <= bestLoad) {
         best = p;
@@ -373,7 +377,8 @@ export class Simulation {
 
   private onDone(n: NodeRT, pool: Pool, req: Req, t: number) {
     this.accountBusy(pool, t);
-    const next = pool.queue.shift();
+    // If chaos removed servers, retire this one instead of pulling more work.
+    const next = pool.busy <= pool.servers ? pool.queue.shift() : undefined;
     if (next) this.schedule({ t: t + this.rng.exp(pool.meanService), k: 'done', n, pool, req: next });
     else pool.busy--;
 
@@ -472,14 +477,29 @@ export class Simulation {
     }
     const n = this.rt.get(ev.nodeId);
     if (!n) return;
+    const flush = (p: Pool) => {
+      for (let r = p.queue.shift(); r; r = p.queue.shift()) this.fail(r, 'unavailable', n);
+    };
     if (ev.kind === 'latency') n.extraLatency += ev.addMs / 1000;
     else if (ev.kind === 'revive') {
       n.dead = false;
+      for (const p of n.pools) p.servers = p.baseServers;
       if (n.backlog) this.ensureDrain(n, this.nowT);
     } else if (ev.kind === 'kill') {
-      n.dead = true;
-      for (const p of n.pools) {
-        for (let r = p.queue.shift(); r; r = p.queue.shift()) this.fail(r, 'unavailable', n);
+      if (n.node.type === 'sqlDb' && n.pools.length > 1) {
+        // Primary fails; replicas keep serving reads (writes fail until revived).
+        n.pools[0].servers = 0;
+        flush(n.pools[0]);
+      } else {
+        n.dead = true;
+        n.pools.forEach(flush);
+      }
+    } else if (ev.kind === 'killInstance') {
+      const p = n.pools[0];
+      p.servers = Math.max(0, p.servers - 1);
+      if (p.servers === 0) {
+        if (n.pools.length === 1) n.dead = true;
+        flush(p);
       }
     }
   }

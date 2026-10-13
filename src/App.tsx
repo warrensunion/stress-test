@@ -120,7 +120,9 @@ export default function App() {
       const lastPoint = r.series[r.series.length - 1];
       const dead = new Set<string>();
       for (const e of r.chaosLog) {
-        if (e.kind === 'kill') dead.add(e.nodeId);
+        const dn = design.nodes.find((n) => n.id === (e.kind === 'spike' ? '' : e.nodeId));
+        // A DB with replicas only loses its primary; show it as alive.
+        if (e.kind === 'kill' && !(dn?.type === 'sqlDb' && (dn.params.replicas ?? 0) > 0)) dead.add(e.nodeId);
         if (e.kind === 'revive') dead.delete(e.nodeId);
       }
       for (const [id, s] of Object.entries(r.nodes)) {

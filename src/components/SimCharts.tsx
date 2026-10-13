@@ -4,7 +4,7 @@ import type { ChaosEvent, SimResult } from '../engine/sim/simulation';
 import { SERIES_COLORS } from './theme';
 
 const chaosLabel = (e: ChaosEvent) =>
-  e.kind === 'spike' ? `spike ×${e.factor}` : e.kind === 'latency' ? `+${e.addMs}ms` : e.kind;
+  e.kind === 'spike' ? `spike ×${e.factor}` : e.kind === 'latency' ? `+${e.addMs}ms` : e.kind === 'killInstance' ? '−1 instance' : e.kind;
 
 function Frame({ title, children }: { title: string; children: React.ReactNode }) {
   return (

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { fmt } from '../engine/estimator';
+import { analyzeChaos } from '../engine/sim/chaosImpact';
 import type { ChaosAction, ChaosEvent } from '../engine/sim/simulation';
 import type { Design } from '../engine/types';
 import type { useSimulator } from '../hooks/useSimulator';
@@ -61,6 +62,7 @@ export function SimPanel({
   };
 
   const sat = sim.saturation;
+  const impact = r && sim.design ? analyzeChaos(sim.design, r) : null;
   const bottleneck = r?.bottleneck;
 
   return (
@@ -150,6 +152,9 @@ export function SimPanel({
         <button className="rounded border border-red-300 bg-white px-2 py-1 text-red-700 hover:bg-red-100" onClick={() => chaos({ kind: 'kill', nodeId })} disabled={!nodeId} data-testid="chaos-kill">
           Kill node
         </button>
+        <button className="rounded border border-red-300 bg-white px-2 py-1 text-red-700 hover:bg-red-100" onClick={() => chaos({ kind: 'killInstance', nodeId })} disabled={!nodeId}>
+          Kill 1 instance
+        </button>
         <button className="rounded border border-red-300 bg-white px-2 py-1 text-red-700 hover:bg-red-100" onClick={() => chaos({ kind: 'latency', nodeId, addMs: 200 })} disabled={!nodeId}>
           +200 ms latency
         </button>
@@ -174,7 +179,7 @@ export function SimPanel({
             Scheduled:
             {scheduled.map((c, i) => (
               <span key={i} className="rounded bg-red-100 px-1.5 text-red-800">
-                {c.kind === 'spike' ? `spike ×${c.factor}` : `${c.kind} ${label(c.nodeId)}`} @ {c.atSec}s
+                {c.kind === 'spike' ? `spike ×${c.factor}` : `${c.kind === 'killInstance' ? 'kill 1 instance' : c.kind} ${label(c.nodeId)}`} @ {c.atSec}s
               </span>
             ))}
             <button className="text-slate-500 underline" onClick={() => onScheduled([])}>
@@ -184,6 +189,29 @@ export function SimPanel({
         )}
       </div>
 
+      {impact && (
+        <div
+          className={`rounded-lg border p-2 text-sm ${impact.severity === 'outage' ? 'border-red-300 bg-red-50' : impact.severity === 'degraded' ? 'border-amber-300 bg-amber-50' : 'border-emerald-300 bg-emerald-50'}`}
+          data-testid="chaos-impact"
+        >
+          <div className="mb-1 font-semibold">
+            What broke{' '}
+            <span className="text-xs font-normal uppercase text-slate-600">
+              ({impact.severity === 'ok' ? 'nothing — absorbed' : impact.severity})
+            </span>
+          </div>
+          <ul className="list-disc space-y-0.5 pl-5">
+            {impact.verdict.map((v, i) => (
+              <li key={i}>{v}</li>
+            ))}
+          </ul>
+          <div className="mt-1 text-xs text-slate-600">
+            Before → after: throughput {fmt(impact.before.throughputRps)} → {fmt(impact.after.throughputRps)} req/s · errors{' '}
+            {(impact.before.errorRate * 100).toFixed(1)}% → {(impact.after.errorRate * 100).toFixed(1)}% · worst p99 {fmt(impact.before.p99Ms)} →{' '}
+            {fmt(impact.after.p99Ms)} ms
+          </div>
+        </div>
+      )}
       {sim.error && <div className="rounded border border-red-300 bg-red-50 p-2 text-sm text-red-800">{sim.error}</div>}
       {!r && !live && <p className="text-sm text-slate-500">Run the simulation to see utilization, queues, latency percentiles and the first bottleneck.</p>}
 
