@@ -2,6 +2,8 @@
 
 A systems design tool that gives **advice backed by simulation, not vibes**. You sketch an architecture, and Stress Test pushes simulated traffic through it. It finds the first component to saturate and the load where that happens. It suggests fixes, re-simulates each one, and only then shows you the numbers.
 
+**Live demo: [warrensunion.github.io/stress-test](https://warrensunion.github.io/stress-test/)**. It runs entirely in the browser: pick **Load preset… → Deliberately bad design**, then **Run simulation**.
+
 - **Estimator**: back-of-the-envelope QPS, storage, bandwidth and cache size, with every formula shown.
 - **Design canvas**: drag-and-drop architecture editor (React Flow), with JSON import and export.
 - **Simulator**: seeded discrete-event simulation in a Web Worker. Reports per-node utilization, queue depth over time, p50/p95/p99, error and drop rate, the first bottleneck and the saturation point.
@@ -9,6 +11,10 @@ A systems design tool that gives **advice backed by simulation, not vibes**. You
 - **Linter**: 17 rules. Each finding has a severity, a message, a "why this matters" note, a suggested fix and, where possible, a one-click fix.
 - **Advice loop**: combines the simulated bottleneck with lint findings into concrete recommendations. Each one is re-simulated before display, and you can apply it with **Apply suggestion & re-simulate**.
 - **Presets**: URL shortener, Twitter-style feed, and a deliberately bad design.
+
+## Stack
+
+TypeScript, React 18, Vite 6, React Flow (`@xyflow/react` 12) for the canvas, Recharts for the charts, Tailwind CSS 3. The engine is plain TypeScript with no UI imports and runs in a Web Worker. Tests: Vitest 3 (69 unit tests) and a Playwright smoke test. GitHub Pages deploys from `.github/workflows/pages.yml`, which runs the unit tests and builds with `GITHUB_PAGES=true` so assets resolve under `/stress-test/`.
 
 ## Quick start
 
@@ -161,7 +167,7 @@ Means and queue lengths match within a few percent. Lq is sampled every 0.5 s ra
 | `deep-sync-chain` | warning | > 4 synchronous hops (queues break the chain) |
 | `cache-on-write-path` | warning | a cache seeing at least as many writes as reads |
 | `cdn-missing-large-objects` | warning | objects ≥ 100 KB, read-heavy, no CDN |
-| `high-utilization` | warning | 80–100% utilized at the configured load |
+| `high-utilization` | warning | 80 to 100% utilized at the configured load |
 | `orphan-node` | info | unreachable from any client |
 | `low-cache-hit-rate` | info | hit rate < 50% |
 | `single-load-balancer` | info | LB with one instance |
